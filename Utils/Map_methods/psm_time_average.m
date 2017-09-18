@@ -220,7 +220,19 @@ for a=1:numel(F)
     end
 end
 
-values = values ./ weights;
+try
+    values = values ./ weights;
+catch err
+    % If "values" isn't defined, then the loop never found a day to
+    % initialize from, so return default non-values
+    if strcmp(err.identifier, 'MATLAB:UndefinedFunction')
+        values = nan;
+        lon_grid = nan;
+        lat_grid = nan;
+    else
+        rethrow(err);
+    end
+end
 
 end
 
