@@ -1,6 +1,20 @@
 function [  ] = raa_180_tests(  )
-%UNTITLED4 Summary of this function goes here
-%   Detailed explanation goes here
+%RAA_180_TESTS Check the extra factor of 180 in the RAA calculation
+%   In theory, relative azimuth angle (RAA) should just be the difference
+%   between the solar and viewing azimuth angles. However, in BEHR there's
+%   an extra factor of 180 that essentially makes it the supplement of that
+%   angle. Ron suggested that this was related to some unpublished work by
+%   Luke Valin that found a in the TOMRAD vs NASA SP RAA definition that it
+%   was the supplement, i.e. rather than RAA = 0 being sun and satellite on
+%   the same side, RAA = 0 means sun and satellite are on opposite sides.
+%   This function was my attempt to reproduce Luke's work, in which he
+%   looked at the same point from opposite sides of the OMI detector and
+%   found significantly different NO2 columns.
+%
+%   I've since found that the definition of RAA = 0 => sun and satellite on
+%   opposite sides is fairly common in radiative transfer models, so one
+%   has to be careful translating between radiative transfer models and
+%   physical sun-satellite geometries.
 
 allowed_cities = {'la','denver','chicago','houston','atlanta'};
 city = ask_multichoice('Which city to plot?',allowed_cities);

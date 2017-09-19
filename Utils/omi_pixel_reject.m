@@ -1,46 +1,41 @@
 function [ omi ] = omi_pixel_reject( omi, reject_mode, varargin )
-%omi_pixel_reject: Set areaweight to 0 for any pixels that will adversely
-%affect the accuracy of the BEHR NO2 map.
+%OMI_PIXEL_REJECT Set areaweight to 0 for any pixels that will adversely affect the accuracy of the BEHR NO2 map.
 %   There are a number of criteria that need to be evaluated for an OMI
 %   pixel before it can be reliably used as an NO2 measurement.  This
 %   function will set the areaweight value to 0 for any pixel which fails
 %   these criteria.
 %
-%   Inputs:
-%       omi_in: An OMI structure, the result of running BEHR_main.m.
-%       cloud_type: 'modis' or 'omi'. Sets which
-%          cloud product to use when rejecting pixels by cloud fraction.
+%   OMI = OMI_PIXEL_REJECT( OMI, 'none' ) Essentially a no-op, does
+%   nothing. Useful only if iterating over fields and do not want to reject
+%   any values for some fields. OMI must be a scalar structure.
+%
+%   OMI = OMI_PIXEL_REJECT( OMI, 'behr' ) Sets areaweight to 0 for any grid
+%   cell that has the BEHRQualityFlags field > 0.
+%
+%   OMI = OMI_PIXEL_REJECT( OMI, 'detailed', REJECT_DETAIL ) Allows fine
+%   control over exactly which pixels are rejected according to the
+%   structure REJECT_DETAILS. This structure must have the fields:
+%       cloud_type: 'omi', 'modis', or 'rad'. Sets which cloud product to
+%           use when rejecting pixels by cloud fraction. 
 %       cloud_frac: The maximum allowed cloud fraction in a pixel.  If
-%          using OMI cloud product, 0.2 is recommended. With MODIS, 0 is
-%          recommended.
-%       rowanomaly_mode: Can be one of 4 values, 'AlwaysByRow',
+%           using OMI cloud product, 0.2 is recommended. With MODIS, 0 to
+%           0.2 is recommended. With radiance, 0.5 is recommended.
+%       row_anom_mode: Can be one of 4 values, 'AlwaysByRow',
 %          'RowsByTime', 'XTrackFlags', and 'XTrackFlagsLight'.
 %          'AlwaysByRow' will always reject pixels in the row affected by
 %          the anomaly, regardless of whether the data occurs before or
 %          after the anomaly reached that row. 'XTrackFlags' uses the row
 %          anomaly flag in the OMNO2 product to reject pixels.  These are
 %          the two recommended methods.
-%       rows: An optional variable that will be used to remove certain rows
-%           from the calculation, for viewing angle dependence tests. If
-%           empty, no rows will be removed. (This allows the user to use
-%           this function even if a Rows field is not present in the OMI
-%           structure). It should be either empty or a two element vector
-%           giving a min and max (inclusive) value for the row numbers,
-%           which are 0 to 59.
+%       check_behr_amf: a scalar logical, if true, rejects pixels for which
+%           the BEHR AMF is <= the minimum value defined by
+%           BEHR_MIN_AMF_VAL()
 %
-%   The rejection criteria are:
-%       VCD Quality Flag is not a even number: the VCD quality flag is a
-%          bit array, with the least significant bit as a summary.  If this
-%          bit is 1, then some error occured during the NASA retrieval and
-%          we should ignore this pixel.
-%       Cloud fraction too great: Cloudy pixels will have much of the
-%          tropospheric column obscured, and should not contribute to the
-%          average.
-%       Column amount > 1E17: This magnitude of tropospheric column is
-%          known to be affected by the row anomaly.
-%       Column amount is NaN: NaN indicates some failure, either averaging
-%          0 values, or another mathematical mistake.
-%       Row anomaly: see http://www.knmi.nl/omi/research/product/rowanomaly-background.php
+%   In 'detailed' mode, a grid cell with mod(VcdQualityFlags, 2) ~= 0 will
+%   always be rejected.
+%
+%   For more information on the row anomaly: see
+%   http://www.knmi.nl/omi/research/product/rowanomaly-background.php
 
 E = JLLErrors;
 
@@ -53,6 +48,10 @@ pout = p.Results;
 
 reject_details = pout.reject_details;
 weight_field = pout.weight_field;
+
+if ~isstruct(omi) || ~isscalar(omi)
+    E.badinput('OMI must be a scalar structure');
+end
 
 allowed_reject_modes = {'none', 'behr', 'detailed'};
 if ~ischar(reject_mode) || ~ismember(reject_mode, allowed_reject_modes)
@@ -76,6 +75,8 @@ if strcmp(reject_mode, 'detailed')
         E.badinput('The "cloud_frac" field of the REJECT_DETAIL struct must be a scalar number');
     elseif ~ismember(reject_details.row_anom_mode, allowed_row_modes)
         E.badinput('The "row_anom_mode" field of the REJECT_DETAIL struct must be one of the strings: %s', strjoin(allowed_row_modes, ', '));
+    elseif ~isscalar(reject_details.check_behr_amf) || ~islogical(reject_details.check_behr_amf)
+        E.badinput('The "check_behr_amf" field of the REJECT_DETAIL struct must be a scalar logical');
     end
 end
 

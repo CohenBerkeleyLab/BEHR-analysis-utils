@@ -1,6 +1,14 @@
 function [  ] = compare_old_new_profiles( date_in, wrf_dir )
-%UNTITLED2 Summary of this function goes here
-%   Detailed explanation goes here
+%COMPARE_OLD_NEW_PROFILES Compare v2 and v3 BEHR WRF profiles
+%   COMPARE_OLD_NEW_PROFILES( DATE_IN, WRF_DIR ) reads the version 2 WRF
+%   NO2 profiles for DATE_IN and compares them to the version 3 WRF
+%   profiles stored in WRF_DIR. Will ask interactively if you wish to
+%   compare against new daily or monthly profiles. This plots them using
+%   the slice GUI so you can examine a whole domain at once.
+%
+%   NOTE from JLL: this was written for my 2016 paper, so there's some
+%   assumptions about the naming of files that needs to be updated (18 Sept
+%   2017).
 
 E = JLLErrors;
 if ~exist(wrf_dir,'dir')

@@ -1,6 +1,81 @@
-function [ values, lon_grid, lat_grid ] = psm_time_average( start_date, end_date, varargin  )
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
+function [ values, lon_grid, lat_grid ] = behr_time_average( start_date, end_date, varargin  )
+%BEHR_TIME_AVERAGE Average version 3 BEHR data over time.
+%   Version 3 of BEHR changed how gridding data is done, therefore this
+%   function supplants no2_column_map_2014 for time averaging. The most
+%   notable change is that, if fields are gridded with the PSM method they
+%   will have a custom weights field, while fields gridded with the CVM
+%   method use the standard Areaweight field.
+%
+%   [ VALUES, LON_GRID, LAT_GRID ] = BEHR_TIME_AVERAGE( START_DATE,
+%   END_DATE ) averages data from the standard behr_mat_dir defined in
+%   behr_paths between START_DATE and END_DATE, which can be either date
+%   numbers or any date string automatically understood by Matlab. This
+%   grids BEHRColumnAmountNO2Trop over the continental US. VALUES is the
+%   weighted average of the VCD defined at lat/lon coordinates given by
+%   LON_GRID and LAT_GRID. If no data is found for the given time period,
+%   VALUES, LON_GRID, and LAT_GRID will all be scalar NaNs.
+%
+%   [ VALUES, LON_GRID, LAT_GRID ] = BEHR_TIME_AVERAGE( START_DATE,
+%   END_DATE, GRID ) averages data within the domain specified by GRID,
+%   which must be an instance of GlobeGrid. It currently does not
+%   interpolate the data to that grid, just cuts off the data outside that
+%   domain.
+%
+%   [ VALUES, LON_GRID, LAT_GRID ] = BEHR_TIME_AVERAGE( START_DATE,
+%   END_DATE, LON_LIM, LAT_LIM ) sets the domain according to LON_LIM and
+%   LAT_LIM, which must be two-element vectors with the more negative
+%   element first. Longitude is define s.t. west = negative.
+%
+%   Additional parameters:
+%       'behr_dir' - a string overriding the standard path to load BEHR
+%       data from. The default is the value given by
+%       behr_paths.behr_mat_dir.
+%
+%       'filepattern' - a pattern that restricts what files in 'behr_dir'
+%       match. The default is 'OMI_BEHR_%s_*.mat' where %s is replaced by
+%       the current BEHR_version().
+%
+%       'dayofweek' - limit which days of the week will be included in the
+%       average. Value is a string with 1-letter abbreviations of the
+%       days of the week to include:
+%           U = Sunday
+%           M = Monday
+%           T = Tuesday
+%           W = Wednesday
+%           R = Thursday
+%           F = Friday
+%           S = Saturday
+%       The default is all days of the week.
+%
+%       'filterpsm' - boolean, default is false, that controls whether PSM
+%       gridded fields should be filtered according to the typical pixel
+%       rejection metrics (clouds, row anomaly, and quality flags). By
+%       default PSM fields are not filtered, since the weights account for
+%       those.
+%
+%       'avgfield' - which data field to average. Must be present in the
+%       OMI structures in the files loaded. Give the field name as a
+%       string.
+%
+%       'rejectmode' - controls how omi_pixel_reject rejects pixels when
+%       averaging CVM fields, or PSM fields with 'filterpsm' = true.
+%       Default value is 'detailed', in which case the next 3 fields impact
+%       the filtering. See documentation omi_pixel_reject() for other valid
+%       values.
+%
+%       'clouds' - which cloud product to use to reject (OMI geometric,
+%       MODIS geometric, or OMI radiance). See documentation for
+%       omi_pixel_reject() for values.
+%
+%       'cloudfraccrit' - the maximum cloud fraction to permit a pixel to
+%       have.
+%
+%       'rowanomaly' - how to identify row anomaly pixels. See
+%       documentation for omi_pixel_reject().
+%
+%       'DEBUG_LEVEL' - scalar numeric value controlling how much
+%       information is printed to the screen. Default is 2, 0 is completely
+%       quiet.
 
 E = JLLErrors;
 
