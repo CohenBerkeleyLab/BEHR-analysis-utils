@@ -1,4 +1,4 @@
-function [ AMFs, SZAvec, VZAvec, RAAvec, ALBvec, SURFPRESSvec ] = amfSensitivityTest(profile, profile_pressures, lon, lat, month  )
+function [ Out ] = amfSensitivityTest_par(profile, profile_pressures, lon, lat, month, skytype  )
 %amfSensitivityTest Given a latitude, longitude, and profile, constructs a
 %five-dimension matrix of AMFs
 %   Scattering weights in the OMNO2 algorithm depend on SZA, VZA, RAA
@@ -11,7 +11,7 @@ function [ AMFs, SZAvec, VZAvec, RAAvec, ALBvec, SURFPRESSvec ] = amfSensitivity
 %   two dimensions will be singletons if only a single lat/lon is
 %   specified.
 
-
+DEBUG_LEVEL = 2;
 
 %%%%%%%%%%%%%%%%%%%
 %%%%% STARTUP %%%%%
@@ -48,33 +48,43 @@ if ~isscalar(numThreads); E.badvartype(numThreads, 'scalar'); end
 %%%%%%%%%%%%%%%%%%%%%%
 
 % # SZAs between 0 and 88 degrees to test
-nSZA = 3;%9;
+nSZA = 9;
 
 % # VZAs between 0 and 70 degrees to test
-nVZA = 3;%6;
+nVZA = 6;
 
 % # RAA (rel. azimuth angles) between 0 and 180 degrees to test
-nRAA = 3;%11;
+nRAA = 5;
 
 % Surface albedo can be between 0 and 1; but you can reset the min and max
 % to restrict to i.e. 0 and 0.1 - this allows you to examine effects of
 % albedo in a range appropriate to a ground type or clouds.
-minAlb = 0;
-maxAlb = 0.1;
-nAlb = 4;%6;
+if strcmpi(skytype,'clear')
+    minAlb = 0;
+    maxAlb = 0.08;
+else
+    minAlb = 0.7;
+    maxAlb = 0.9;
+end
+nAlb = 10;
 
 % Surface pressure can vary between 1013 and 0.003 hPa; but like albedo,
 % you may reset the min and max.
-minSurfPres = 880;
-maxSurfPres = 1013;
-nSurfPres = 2;%5;
+if strcmpi(skytype,'clear')
+    minSurfPres = 795;
+    maxSurfPres = 1013;
+else
+    minSurfPres = 344;
+    maxSurfPres = 1003;
+end
+nSurfPres = 10;
 
 % set to 'OMI' (eventually perhaps 'GOME' will be an option) to determine
 % what pressure levels to use
 satellite = 'OMI';
 
 % Location of the OMI temperature profiles and scattering weights
-amf_tools_path = '/Users/Josh/Documents/MATLAB/BEHR/AMF_tools';
+amf_tools_path = fileparts(mfilename('fullpath'));
 fileTmp = fullfile(amf_tools_path,'nmcTmpYr.txt');
 fileDamf = fullfile(amf_tools_path,'damf.txt');
 
@@ -131,11 +141,18 @@ end
 % Generate the vectors of SZA, VZA, RAA, albedo, and surface pressure that
 % will generate 
 
-SZAvec = linspace(0,88,nSZA);
-VZAvec = linspace(0,70,nVZA);
-RAAvec = linspace(0,180,nRAA);
-ALBvec = linspace(minAlb, maxAlb, nAlb);
-SURFPRESSvec = linspace(maxSurfPres, minSurfPres, nSurfPres);
+SZAvec = reshape(linspace(0,88,nSZA),[],1,1,1,1);
+VZAvec = reshape(linspace(0,70,nVZA),1,[],1,1,1);
+RAAvec = reshape(linspace(0,180,nRAA),1,1,[],1,1);
+ALBvec = reshape(linspace(minAlb, maxAlb, nAlb),1,1,1,[],1);
+SURFPRESSvec = reshape(linspace(maxSurfPres, minSurfPres, nSurfPres),1,1,1,1,[]);
+
+sz = [numel(SZAvec), numel(VZAvec), numel(RAAvec), numel(ALBvec), numel(SURFPRESSvec)];
+SZAmat = repmat(SZAvec, 1, sz(2), sz(3), sz(4), sz(5));
+VZAmat = repmat(VZAvec, sz(1), 1, sz(3), sz(4), sz(5));
+RAAmat = repmat(RAAvec, sz(1), sz(2), 1, sz(4), sz(5));
+ALBmat = repmat(ALBvec, sz(1), sz(2), sz(3), 1, sz(5));
+SURFPRESSmat = repmat(SURFPRESSvec, sz(1), sz(2), sz(3), sz(4), 1);
 
 fill_val = -127;
 
@@ -155,57 +172,61 @@ end
 % and close it at the end.
 if isempty(gcp('nocreate')) && onCluster
     parpool(numThreads);
+    n_workers = numThreads;
     closeparpool = true;
 else
     closeparpool = false;
+    n_workers = 0;
 end
 
-% To be safe with the parallel loop, get the number of elements in each
-% vector outside the loop, rather than as function calls inside the loop.
-n1 = numel(SZAvec);
-n2 = numel(VZAvec);
-n3 = numel(RAAvec);
-n4 = numel(ALBvec);
-n5 = numel(SURFPRESSvec);
-n6 = numel(lon);
-n7 = numel(lat);
+nlon = numel(lon);
+nlat = numel(lat);
 
-% Many many loops to iterate over each variable
-for x6 = 1:n6;
-    for x7 = 1:n7;
+
+
+% By constructing the inputs as a matrix we can fully parallelize it rather
+% than only be able to parallelize say the SZA loop.
+for xlon = 1:nlon;
+    for xlat = 1:nlat;
         % Read the temperature profile for this lat/lon
-        temperature = rNmcTmp2(fileTmp, presLevels, lon(x6), lat(x7), month);
+        temperature = rNmcTmp2(fileTmp, presLevels, lon(xlon), lat(xlat), month);
         
-        for x1=1:n1;
-            fprintf('Now on SZA %d\n',x1);
-            for x2=1:n2
-                for x3=1:n3
-                    for x4=1:n4
-                        for x5=1:n5
-                            sza_i = SZAvec(x1);
-                            vza_i = VZAvec(x2); %#ok<*PFBNS>
-                            phi_i = RAAvec(x3);
-                            albedo_i = ALBvec(x4);
-                            surfPres_i = SURFPRESSvec(x5);
-                            
-                            dAmfClr = rDamf2(fileDamf, presLevels, sza_i, vza_i, phi_i, albedo_i, surfPres_i);
-                            
-                            cloudalbedo=0.8;
-                            cloudPres_i = 500;
-                            cldFrac_i = 0; 
-                            cldRadFrac_i = 0;
-                            dAmfCld = rDamf2(fileDamf, presLevels, sza_i, vza_i, phi_i, cloudalbedo, cloudPres_i);
-                            
-                            amf_i = omiAmfAK2(surfPres_i, cloudPres_i, cldFrac_i, cldRadFrac_i, presLevels, dAmfClr, dAmfCld, temperature, interp_profile);
-                            
-                            AMFs(x1,x2,x3,x4,x5,x6,x7) = amf_i;
-                        end
-                    end
+        parfor(x=1:numel(AMFs), n_workers)
+            sza_i = SZAmat(x);
+            vza_i = VZAmat(x);
+            phi_i = RAAmat(x);
+            albedo_i = ALBmat(x);
+            surfPres_i = SURFPRESSmat(x);
+            
+            if DEBUG_LEVEL > 1
+                t = getCurrentTask;
+                if isempty(t)
+                    t.ID = 0;
                 end
+                fprintf('Worker %d: SZA = %f, VZA = %f, RAA = %f, ALB = %f, SURFP = %f\n', t.ID, sza_i, vza_i, phi_i, albedo_i, surfPres_i);
             end
+            
+            dAmfClr = rDamf2(fileDamf, presLevels, sza_i, vza_i, phi_i, albedo_i, surfPres_i);
+            
+            cloudalbedo=0.8;
+            cloudPres_i = 500;
+            cldFrac_i = 0;
+            cldRadFrac_i = 0;
+            dAmfCld = rDamf2(fileDamf, presLevels, sza_i, vza_i, phi_i, cloudalbedo, cloudPres_i);
+            
+            amf_i = omiAmfAK2(surfPres_i, cloudPres_i, cldFrac_i, cldRadFrac_i, presLevels, dAmfClr, dAmfCld, temperature, interp_profile);
+            
+            AMFs(x) = amf_i;
         end
     end
 end
+
+Out.AMFs = AMFs;
+Out.SZAs = SZAmat;
+Out.VZAs = VZAmat;
+Out.RAAs = RAAmat;
+Out.ALBs = ALBmat;
+Out.SurfPs = SURFPRESSmat;
 
 if closeparpool
     p = gcp('nocreate');
