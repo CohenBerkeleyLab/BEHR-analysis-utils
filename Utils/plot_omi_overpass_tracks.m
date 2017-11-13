@@ -160,6 +160,8 @@ if ~patchbool
                 ls = '-';
             end
             l(a) = linem(swath_lat{a}{b}, swath_lon{a}{b}, 'color', cmap(a, :), 'linestyle', ls);
+            t_i = round((a+1)/(numel(swath_lon)+2)*numel(swath_lon{a})); % move the start time along the orbit so that each day is slightly offset
+            textm(swath_lat{a}{b}(t_i), swath_lon{a}{b}(t_i), datestr(swath_utc{a}(b,1), 'HH:MM'));
         end
         legstr{a} = datestr(dnums(a), 'yyyy-mm-dd');
     end

@@ -9,20 +9,31 @@ function [ varargout ] = load_behr_file( file_date, prof_mode, region )
 %
 %   [ Data, OMI ] = LOAD_BEHR_FILE( FILE_DATE ) Returns Data and OMI as
 %   outputs instead.
+%
+%   [ Data ] = LOAD_BEHR_FILE( FILE_DATE ) Will only load Data, which can
+%   be faster.
 
 if ~exist('region','var')
     region = 'us';
 end
 
-behr_file = fullfile(behr_paths.behr_mat_dir, behr_filename(file_date, prof_mode, region));
-D = load(behr_file);
+if nargout == 1
+    load_vars = {'Data'};
+else
+    load_vars = {'Data', 'OMI'};
+end
+
+behr_file = fullfile(behr_paths.BEHRMatSubdir(region, prof_mode), behr_filename(file_date, prof_mode, region));
+D = load(behr_file, load_vars{:});
 if nargout == 0
     Data = D.Data;
     OMI = D.OMI;
     putvar(Data,OMI);
 else
     varargout{1} = D.Data;
-    varargout{2} = D.OMI;
+    if nargout > 1
+        varargout{2} = D.OMI;
+    end
 end
 
 end

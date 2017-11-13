@@ -29,7 +29,9 @@ function [ values, lon_grid, lat_grid ] = behr_time_average( start_date, end_dat
 %   Additional parameters:
 %       'behr_dir' - a string overriding the standard path to load BEHR
 %       data from. The default is the value given by
-%       behr_paths.behr_mat_dir.
+%       behr_paths.BEHRMatSubdir for the region and profile mode specified
+%       by the 'region' and 'prof_mode' parameters respectively (which
+%       default to 'us' and 'monthly').
 %
 %       'filepattern' - a pattern that restricts what files in 'behr_dir'
 %       match. The default is 'OMI_BEHR_%s_*.mat' where %s is replaced by
@@ -87,8 +89,10 @@ E = JLLErrors;
 p = inputParser;
 p.addOptional('lon_bdy', GlobeGrid(0.05, 'domain', 'us'));
 p.addOptional('lat_bdy', []);
-p.addParameter('behr_dir', behr_paths.behr_mat_dir);
-p.addParameter('filepattern', sprintf('OMI_BEHR_%s_*.mat', BEHR_version));
+p.addParameter('region', 'us');
+p.addParameter('prof_mode', 'monthly');
+p.addParameter('behr_dir', '');
+p.addParameter('filepattern', '');
 p.addParameter('dayofweek', 'UMTWRFS');
 p.addParameter('holidays', false);
 p.addParameter('filterpsm', false);
@@ -132,7 +136,9 @@ else
 end
 
 
-if ~ischar(pout.behr_dir)
+if isempty(pout.behr_dir)
+    behr_dir = behr_paths.BEHRMatSubdir(pout.region, pout.prof_mode);
+elseif ~ischar(pout.behr_dir)
     E.badinput('"behr_dir" must be a string')
 elseif ~exist(pout.behr_dir, 'dir');
     E.badinput('"behr_dir" %s does not exist', pout.behr_dir)
@@ -140,7 +146,9 @@ else
     behr_dir = pout.behr_dir;
 end
 
-if ~ischar(pout.filepattern)
+if isempty(pout.filepattern)
+    file_pattern = behr_filename('*', pout.prof_mode, pout.region, 'mat');
+elseif ~ischar(pout.filepattern)
     E.badinput('"filepattern" must be a string');
 else
     file_pattern = pout.filepattern;
@@ -215,7 +223,7 @@ grid_var = 'OMI';
 
 F = dir(fullfile(behr_dir, file_pattern));
 if isempty(F)
-    E.filenotfound('No files matching %s were found in %s', file_pattern, behr_dir);
+    E.filenotfound('Files matching %s in %s', file_pattern, behr_dir);
 end
 
 first_file = true;
