@@ -92,12 +92,12 @@ p.addParameter('filepattern', sprintf('new_OMI_BEHR_v2-1C_*.mat', BEHR_version))
 p.addParameter('dayofweek', 'UMTWRFS');
 p.addParameter('holidays', false);
 p.addParameter('filterpsm', false);
-p.addParameter('avgfield1', 'BEHRColumnAmountNO2Trop');
-p.addParameter('avgfield2', 'WRF_AK_Column_NO2');
-p.addParameter('avgfield3', 'WRF_Column_NO2');
+p.addParameter('avgfield1', 'BEHRColumnAmountNO2TropVisOnly');
+p.addParameter('avgfield2', 'WRF_AK_Column_NO2_Visonly');
+p.addParameter('avgfield3', 'WRF_AK_Column_NO2');
 p.addParameter('rejectmode', 'detailed');
 p.addParameter('clouds', 'omi');
-p.addParameter('cloudfraccrit', 0.2);
+p.addParameter('cloudfraccrit', 1);
 p.addParameter('rowanomaly', 'XTrackFlags');
 p.addParameter('DEBUG_LEVEL', 2);
 
