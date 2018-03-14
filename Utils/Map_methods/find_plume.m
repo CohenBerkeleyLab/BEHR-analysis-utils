@@ -23,9 +23,20 @@ combined_dif = lat_dif + lon_dif;
 
 %The linear index of the center pixel
 center_pix = find(combined_dif == min(combined_dif(:)));
-if matrix_in(center_pix) < threshold;
-    error('center_error:below_threshold','The center pixel value is below the stated threshold. Aborting.');
+
+%Redefine it as a anonymous function
+%As in the original code, the if statement in line 57 is
+%matrix_in(n_row(b), n_col(b)) >= threshold. To keep it as the format in
+%the case that the threshold is the anonymous function defined in
+%find_wrf_tropopause.m, the threshold is defined as @(t) t>=th-matrix_in(center_pix);
+if isnumeric(threshold)
+    th = threshold;
+    threshold = @(t) t>=th-matrix_in(center_pix);
 end
+% 
+% if ~isa(threshold,'function_handle')
+%     error('center_error:below_threshold','The center pixel value is below the stated threshold. Aborting.');
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -47,7 +58,7 @@ while true
         for b = 1:8;
             if n_row(b) < 1 || n_row(b) > size(plume_mat,1) || n_col(b) < 1 || n_col(b) > size(plume_mat,2) % edge case. Cannot evaluate b/c requested grid cell does not exist
             elseif plume_mat(n_row(b), n_col(b)) > 0 %A 0 indicates this cell has not yet been visited.  If the value is >0, skip this cell because it has already been considered
-            elseif matrix_in(n_row(b), n_col(b)) >= threshold
+            elseif threshold(matrix_in(n_row(b), n_col(b))-matrix_in(center_pix))%matrix_in(n_row(b), n_col(b)) >= threshold
                 plume_mat(n_row(b), n_col(b)) = 1; %A value of 1 indicates that this pixel is part of the plume but its neighbors have not yet been checked.
             end                              %By setting this to 1, the loop will catch it next time and check its neighbors.
         end
