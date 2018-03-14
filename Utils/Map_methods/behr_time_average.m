@@ -1,4 +1,4 @@
-function [ values1,values2,values3, lon_grid, lat_grid ] = behr_time_average( start_date, end_date, varargin  )
+function [ values, lon_grid, lat_grid ] = behr_time_average( start_date, end_date, varargin  )
 %BEHR_TIME_AVERAGE Average version 3 BEHR data over time.
 %   Version 3 of BEHR changed how gridding data is done, therefore this
 %   function supplants no2_column_map_2014 for time averaging. The most
@@ -88,16 +88,14 @@ p = inputParser;
 p.addOptional('lon_bdy', GlobeGrid(0.05, 'domain', 'us'));
 p.addOptional('lat_bdy', []);
 p.addParameter('behr_dir', behr_paths.behr_mat_dir);
-p.addParameter('filepattern', sprintf('new_OMI_BEHR_v2-1C_*.mat', BEHR_version));
+p.addParameter('filepattern', sprintf('OMI_BEHR_%s_*.mat', BEHR_version));
 p.addParameter('dayofweek', 'UMTWRFS');
 p.addParameter('holidays', false);
 p.addParameter('filterpsm', false);
-p.addParameter('avgfield1', 'BEHRColumnAmountNO2TropVisOnly');
-p.addParameter('avgfield2', 'WRF_AK_Column_NO2_Visonly');
-p.addParameter('avgfield3', 'WRF_AK_Column_NO2');
+p.addParameter('avgfield', 'BEHRColumnAmountNO2Trop');
 p.addParameter('rejectmode', 'detailed');
 p.addParameter('clouds', 'omi');
-p.addParameter('cloudfraccrit', 1);
+p.addParameter('cloudfraccrit', 0.2);
 p.addParameter('rowanomaly', 'XTrackFlags');
 p.addParameter('DEBUG_LEVEL', 2);
 
@@ -154,12 +152,10 @@ else
     days_of_week = pout.dayofweek;
 end
 
-if ~ischar(pout.avgfield1)
+if ~ischar(pout.avgfield)
     E.badinput('"avgfield" must be a string')
 else
-    avg_field1 = pout.avgfield1;
-    avg_field2 = pout.avgfield2;
-    avg_field3 = pout.avgfield3;
+    avg_field = pout.avgfield;
 end
 
 if ~ischar(pout.rejectmode)
@@ -249,15 +245,8 @@ for a=1:numel(F)
     
     D = load(fullfile(behr_dir, F(a).name), grid_var);
     if first_file
-        
-        if ~isfield(D.(grid_var), char(avg_field1))
-            E.badinput('%s is not a field in %s', avg_field1, fullfile(behr_dir, F(a).name));
-        end
-        if ~isfield(D.(grid_var), char(avg_field2))
-            E.badinput('%s is not a field in %s', avg_field2, fullfile(behr_dir, F(a).name));
-        end
-        if ~isfield(D.(grid_var), char(avg_field3))
-            E.badinput('%s is not a field in %s', avg_field3, fullfile(behr_dir, F(a).name));
+        if ~isfield(D.(grid_var), avg_field)
+            E.badinput('%s is not a field in %s', avg_field, fullfile(behr_dir, F(a).name));
         end
         
         % The PSM gridded fields each have their own weights. All the CVM
@@ -265,12 +254,10 @@ for a=1:numel(F)
         % are named as the field they are weights for + 'Weights', so we
         % check if that field is available and if so, use it as the
         % weighting field.
-        weights_field = sprintf('%sWeights', avg_field1);
-        %weights_field2 = sprintf('%sWeights', avg_field2);
+        weights_field = sprintf('%sWeights', avg_field);
         is_psm = true;
         if ~isfield(D.(grid_var), weights_field)
             weights_field = 'Areaweight';
- 
             is_psm = false;
         end
         
@@ -284,9 +271,7 @@ for a=1:numel(F)
         
         % Initialize the value and weights matrices
         sz = size(lon_grid);
-        values1 = zeros(sz);
-        values2 = zeros(sz);
-        values3 = zeros(sz);
+        values = zeros(sz);
         weights = zeros(sz);
         
         first_file = false;
@@ -303,23 +288,15 @@ for a=1:numel(F)
             this_swath = omi_pixel_reject(this_swath, reject_mode, reject_details, 'weight_field', weights_field);
         end
         
-        this_swath_values1 = this_swath.(avg_field1)(yy,xx);
-        this_swath_values2 = this_swath.(avg_field2)(yy,xx);
-        this_swath_values3 = this_swath.(avg_field3)(yy,xx);
-        indx = this_swath_values2 <=1e-9;
-        this_swath_values2(indx) = nan;
+        this_swath_values = this_swath.(avg_field)(yy,xx);
         this_swath_weights = this_swath.(weights_field)(yy,xx);
-        values1 = nansum(cat(3, values1, this_swath_values1 .* this_swath_weights), 3);
-        values2 = nansum(cat(3, values2, this_swath_values2 .* this_swath_weights), 3);
-        values3 = nansum(cat(3, values3, this_swath_values3 .* this_swath_weights), 3);
+        values = nansum(cat(3, values, this_swath_values .* this_swath_weights), 3);
         weights = nansum(cat(3, weights, this_swath_weights),3);
     end
 end
 
 try
-    values1 = values1 ./ weights;
-    values2 = values2 ./ weights;
-    values3 = values3 ./ weights;
+    values = values ./ weights;
 catch err
     % If "values" isn't defined, then the loop never found a day to
     % initialize from, so return default non-values
