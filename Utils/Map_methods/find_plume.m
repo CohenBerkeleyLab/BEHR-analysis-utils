@@ -24,11 +24,10 @@ combined_dif = lat_dif + lon_dif;
 %The linear index of the center pixel
 center_pix = find(combined_dif == min(combined_dif(:)));
 
-%Redefine it as a anonymous function
-%As in the original code, the if statement in line 57 is
-%matrix_in(n_row(b), n_col(b)) >= threshold. To keep it as the format in
-%the case that the threshold is the anonymous function defined in
-%find_wrf_tropopause.m, the threshold is defined as @(t) t>=th-matrix_in(center_pix);
+%if the threshold is numeric, redefine it as a anonymous function
+%As in the original code, the 'if' statement in line 57 is
+%matrix_in(n_row(b), n_col(b)) >= threshold. To keep it as the same format,
+%the threshold is defined as @(t) t>=th-matrix_in(center_pix);
 if isnumeric(threshold)
     th = threshold;
     threshold = @(t) t>=th-matrix_in(center_pix);
