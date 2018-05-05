@@ -1,4 +1,4 @@
-function [ SumWeightedColumn, SumWeight, Count ] = BEHR_day_no2( OMI, varargin )
+function [ values, count ] = BEHR_day_no2( OMI, varargin )
 %BEHR_DAY_NO2 - handles the weighting of a day's worth of BEHR data
 
 E = JLLErrors;
@@ -8,66 +8,61 @@ E = JLLErrors;
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-p.addParameter('mapfield','',@ischar)
-p.addParameter('cloud_prod','omi',@(x) ismember(lower(x),{'omi','rad','modis'}));
-p.addParameter('cloud_frac_max',0.2,@(x) (isnumeric(x) && isscalar(x)));
-p.addParameter('row_anomaly','XTrackFlags', @(x) ismember(x, {'AlwaysByRow', 'RowsByTime', 'XTrackFlags', 'XTrackFlagsLight'}));
-p.addParameter('rows',[],@(x) (isnumeric(x) && (numel(x) == 0 || numel(x) == 2)));
-p.addParameter('sza', 180, @(x) (isnumeric(x) && isscalar(x) && x >= 0))
+p.addOptional('avgfield','BEHRColumnAmountNO2Trop',@ischar)
+p.addParameter('weightsfield','Areaweight',@ischar);
+p.addParameter('rejectmode', 'detailed');
+p.addParameter('clouds', 'omi');
+p.addParameter('cloudfraccrit', 0.2);
+p.addParameter('rowanomaly', 'XTrackFlags');
+p.addParameter('checkamf',true);
 
 p.parse(varargin{:});
 pout = p.Results;
-mapfield = pout.mapfield;
-cloud_prod = pout.cloud_prod;
-cloud_frac_max = pout.cloud_frac_max;
-row_anomaly = pout.row_anomaly;
-rows = pout.rows;
-sza = pout.sza;
 
-% Check that OMI is some sort of satellite output structure, be it BEHR or
-% NASA SP
-if ~isstruct(OMI)
-    E.badinput('OMI must be a structure');
-elseif isfield(OMI,'BEHRColumnAmountNO2Trop')
-    usebehr = true;
-    if isempty(mapfield)
-        mapfield = 'BEHRColumnAmountNO2Trop';
-    end
-elseif isfield(OMI, 'ColumnAmountNO2Trop');
-    usebehr = false;
-    if isempty(mapfield)
-        mapfield = 'ColumnAmountNO2Trop';
-    end
-else
-    E.badinput('OMI is expected to have a tropospheric column amount NO2 field, BEHR or SP');
+avg_field = pout.avgfield;
+weights_field = pout.weightsfield;
+
+if ~ischar(avg_field)
+    E.badinput('MAPFIELD must be a character array')
+elseif ~isfield(OMI, avg_field)
+    E.badinput('MAPFIELD must be a field in OMI');
+end
+if ~ischar(weights_field)
+    E.badinput('WEIGHTSFIELD must be a character array')
+elseif ~isfield(OMI, weights_field)
+    E.badinput('WEIGHTSFIELD must be a field in OMI');
 end
 
+if ~ischar(pout.rejectmode)
+    % Validation of what values it may have should be done in
+    % omi_pixel_reject.
+    E.badinput('"rejectmode" must be a string')
+else
+    reject_mode = pout.rejectmode;
+end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% MAIN FUNCTION %%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
+% Likewise, these get checked in omi_pixel_reject
+reject_details.cloud_type = pout.clouds;
+reject_details.cloud_frac = pout.cloudfraccrit;
+reject_details.row_anom_mode = pout.rowanomaly;
+reject_details.check_behr_amf = pout.checkamf;
 
-SumWeightedColumn = zeros(size(OMI(1).(mapfield)));
-SumWeight = zeros(size(OMI(1).(mapfield)));
-Count = zeros(size(OMI(1).(mapfield)));
+values = nan(size(OMI(1).(avg_field)));
+weights = nan(size(OMI(1).(avg_field)));
+count = zeros(size(OMI(1).(avg_field)));
 
 for a=1:numel(OMI)
-    omi = OMI(a);
+    this_swath = omi_pixel_reject(OMI(a), reject_mode, reject_details, 'weight_field', weights_field);
     
-    if usebehr
-        omi = omi_pixel_reject(omi, cloud_prod, cloud_frac_max, row_anomaly, rows, sza); %We will set the area weight to 0 for any elements that should not contribute to the average
-    else
-        omi = omi_sp_pixel_reject(omi, cloud_prod, cloud_frac_max, row_anomaly, rows);
-    end
-    
-    SumWeightedColumn = nansum2(cat(3,SumWeightedColumn, omi.(mapfield) .* omi.Areaweight),3);
-    SumWeight = nansum2(cat(3, SumWeight, omi.Areaweight),3);
-    if isfield(omi,'Count')
-        this_count = omi.Count;
-        this_count(omi.Areaweight <= 0) = 0;
-        Count = nansum2(cat(3, Count, this_count),3);
-    end
+    this_swath_values = this_swath.(avg_field);
+    this_swath_weights = this_swath.(weights_field);
+    values = nansum(cat(3, values, this_swath_values .* this_swath_weights), 3);
+    weights = nansum(cat(3, weights, this_swath_weights),3);
+    count = count + weights > 0;
 end
+
+values = values ./ weights;
+
 
 end
 

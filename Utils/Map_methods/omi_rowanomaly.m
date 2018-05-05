@@ -41,7 +41,7 @@ switch parse_mode
         xx = find(log);
         
     case 'XTrackFlags'
-        xx = xtrack_flags ~= 0;
+        xx = xtrack_flags > 0;
     case 'XTrackFlagsLight'
         xx = false(size(xtrack_flags));
         for a=1:numel(xtrack_flags)

@@ -1,4 +1,4 @@
-function [ varargout ] = load_behr_file( file_date, prof_mode, region )
+function [ varargout ] = load_behr_file( file_date, prof_mode, region, version )
 %LOAD_BEHR_FILE Convenience function to load a BEHR file for a given date
 %
 %   LOAD_BEHR_FILE( FILE_DATE, PROF_MODE, REGION ) Loads the BEHR .mat file
@@ -17,13 +17,19 @@ if ~exist('region','var')
     region = 'us';
 end
 
+if ~exist('version','var')
+    file_name = behr_filename(file_date, prof_mode, region);
+else
+    file_name = behr_filename(file_date, prof_mode, region, '.mat', version);
+end
+
 if nargout == 1
     load_vars = {'Data'};
 else
     load_vars = {'Data', 'OMI'};
 end
 
-behr_file = fullfile(behr_paths.BEHRMatSubdir(region, prof_mode), behr_filename(file_date, prof_mode, region));
+behr_file = fullfile(behr_paths.BEHRMatSubdir(region, prof_mode), file_name);
 D = load(behr_file, load_vars{:});
 if nargout == 0
     Data = D.Data;

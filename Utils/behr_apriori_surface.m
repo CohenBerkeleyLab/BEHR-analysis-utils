@@ -10,16 +10,38 @@ function [ apri_surf_cell ] = behr_apriori_surface( Data, apri_field )
 %
 %   APRIORI_SURFACE = BEHR_APRIORI_SURFACE( DATA, APRI_FIELD ) will use the
 %   field given by APRI_FIELD instead of BEHRNO2apriori.
+%
+%   APRIORI_SURFACE = BEHR_APRIORI_SURFACE( APRIORI_ARRAY ) will operate
+%   given the 3D array of apriori profiles directly. This requires that the
+%   array be organized as it is in the Data structure, that the vertical
+%   dimension is first, i.e. APRIORI_ARRAY(:,i) will provide the i-th
+%   profile.
 
 if ~exist('apri_field','var')
     apri_field = 'BEHRNO2apriori';
 end
 
-apri_surf_cell = cell(size(Data));
-for d=1:numel(Data)
-    apri_surf = nan(size(Data(d).Longitude));
+if isstruct(Data)
+    n_swaths = numel(Data);
+    apri_surf_cell = cell(size(Data));
+elseif isnumeric(Data)
+    n_swaths = 1;
+    apri_surf_cell = cell(1);
+end
+
+
+for d=1:n_swaths
+    if isstruct(Data)
+        no2_apriori = Data(d).(apri_field);
+    else
+        no2_apriori = Data;
+    end
+    
+    apri_sz = size(no2_apriori);
+    apri_surf = nan(apri_sz(2:end));
+    
     for a=1:numel(apri_surf)
-        no2_slice = Data(d).(apri_field)(:,a);
+        no2_slice = no2_apriori(:,a);
         i = find(~isnan(no2_slice),1,'first');
         if ~isempty(i)
             apri_surf(a) = no2_slice(i);

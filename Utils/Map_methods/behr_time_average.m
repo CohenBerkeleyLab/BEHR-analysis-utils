@@ -106,15 +106,8 @@ p.addParameter('DEBUG_LEVEL', 2);
 p.parse(varargin{:});
 pout = p.Results;
 
-if ~iscell(start_date)
-    start_date = {start_date};
-end
-if ~iscell(end_date)
-    end_date = {end_date};
-end
-
-start_date = cellfun(@validate_date,start_date);
-end_date = cellfun(@validate_date,end_date);
+start_date = validate_date(start_date);
+end_date = validate_date(end_date);
 if numel(start_date) ~= numel(end_date)
     E.badinput('START_DATE and END_DATE must have the same number of elements');
 end
@@ -140,7 +133,7 @@ if isempty(pout.behr_dir)
     behr_dir = behr_paths.BEHRMatSubdir(pout.region, pout.prof_mode);
 elseif ~ischar(pout.behr_dir)
     E.badinput('"behr_dir" must be a string')
-elseif ~exist(pout.behr_dir, 'dir');
+elseif ~exist(pout.behr_dir, 'dir')
     E.badinput('"behr_dir" %s does not exist', pout.behr_dir)
 else
     behr_dir = pout.behr_dir;
