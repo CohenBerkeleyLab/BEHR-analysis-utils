@@ -216,7 +216,7 @@ grid_var = 'OMI';
 
 F = dir(fullfile(behr_dir, file_pattern));
 if isempty(F)
-    E.filenotfound('Files matching %s in %s', file_pattern, behr_dir);
+    E.filenotfound('No files matching %s in %s', file_pattern, behr_dir);
 end
 
 first_file = true;

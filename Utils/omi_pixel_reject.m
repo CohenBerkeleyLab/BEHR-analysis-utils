@@ -1,4 +1,4 @@
-function [ omi ] = omi_pixel_reject( omi, reject_mode, varargin )
+function [ varargout ] = omi_pixel_reject( omi, reject_mode, varargin )
 %OMI_PIXEL_REJECT Set areaweight to 0 for any pixels that will adversely affect the accuracy of the BEHR NO2 map.
 %   There are a number of criteria that need to be evaluated for an OMI
 %   pixel before it can be reliably used as an NO2 measurement.  This
@@ -39,18 +39,31 @@ function [ omi ] = omi_pixel_reject( omi, reject_mode, varargin )
 %
 %   For more information on the row anomaly: see
 %   http://www.knmi.nl/omi/research/product/rowanomaly-background.php
+%
+%   Parameters:
+%
+%       'weight_field' - which field to set weights to 0 in for bad pixels.
+%       Default is 'Areaweight'. Not used if 'return_mode' set to
+%       'logical'.
+%
+%       'return_mode' - how to mark bad pixels. Default is 'weight', which
+%       set the field specified by 'weight_field' to 0 for bad pixels. May
+%       also be 'logical', which returns a logical array the same size as
+%       OMI.Longitude that is true for bad pixels.
 
 E = JLLErrors;
 
 p = inputParser;
 p.addOptional('reject_details', struct(), @isstruct);
 p.addParameter('weight_field', 'Areaweight', @ischar);
+p.addParameter('return_mode', 'weight', @ischar);
 
 p.parse(varargin{:});
 pout = p.Results;
 
 reject_details = pout.reject_details;
 weight_field = pout.weight_field;
+return_mode = pout.return_mode;
 
 if ~isstruct(omi) || ~isscalar(omi)
     E.badinput('OMI must be a scalar structure');
@@ -108,6 +121,12 @@ switch reject_mode
         E.notimplemented('Required fields not defined for REJECT_MODE == ''%s''', reject_mode);
 end
 
+% If just returning the bad pixel logical, we don't need Areaweight.
+if strcmpi(return_mode, 'logical')
+    unneeded_field = strcmp(req_fields, 'Areaweight');
+    req_fields(unneeded_field) = [];
+end
+
 if ~isstruct(omi) || ~isscalar(omi) || (numel(req_fields) > 0 && any(~isfield(omi, req_fields)))
     E.badinput('OMI must be a scalar structure with the fields %s', strjoin(req_fields, ', '))
 end
@@ -122,14 +141,21 @@ if strcmpi(reject_mode, 'none')
     % generates bad values in the VCD.
 elseif strcmpi(reject_mode, 'behr')
     % Reject pixels marked as low quality by the BEHRQualityFlags
-    omi.(weight_field) = reject_by_behr_flags(omi.BEHRQualityFlags, omi.(weight_field), 1);
+    bad_pix = reject_by_behr_flags(omi.BEHRQualityFlags, 1);
 elseif strcmpi(reject_mode, 'behr-error')
     % Reject pixels marked as having a critical error by the
     % BEHRQualityFlags
-    omi.(weight_field) = reject_by_behr_flags(omi.BEHRQualityFlags, omi.(weight_field), 2);
+    bad_pix = reject_by_behr_flags(omi.BEHRQualityFlags, 2);
 elseif strcmpi(reject_mode, 'detailed')
     sel_cloud_field = cld_fields.(reject_details.cloud_type);
-    omi.(weight_field) = reject_by_details(reject_details, omi.(sel_cloud_field), omi.VcdQualityFlags, omi.XTrackQualityFlags, omi.BEHRAMFTrop, omi.Row, omi.(weight_field));
+    bad_pix = reject_by_details(reject_details, omi.(sel_cloud_field), omi.VcdQualityFlags, omi.XTrackQualityFlags, omi.BEHRAMFTrop, omi.Row);
+end
+
+if strcmpi(return_mode, 'weight')
+    omi.(weight_field)(bad_pix) = 0;
+    varargout{1} = omi;
+elseif strcmpi(return_mode, 'logical')
+    varargout{1} = bad_pix;
 end
 
 % If we added VcdQualityFlags as a hack to make this function work with
@@ -141,16 +167,16 @@ end
 
 end
 
-function areaweight = reject_by_behr_flags(behr_flags, areaweight, reject_bit)
+function bad_pix = reject_by_behr_flags(behr_flags, reject_bit)
 % This is a fix to handle NaNs showing up in the flags, NaNs cause bitand
 % to error, and we want to reject them anyway, so just replace NaNs with a
 % value that will definitely be rejected
 rej_num = bitset(0, reject_bit);
 behr_flags(isnan(behr_flags)) = rej_num;
-areaweight(bitand(behr_flags, rej_num)>0) = 0;
+bad_pix = bitand(behr_flags, rej_num)>0;
 end
 
-function areaweight = reject_by_details(details, cloud_frac, vcd_flags, xtrack_flags, behr_amf, rows, areaweight)
+function bad_pix = reject_by_details(details, cloud_frac, vcd_flags, xtrack_flags, behr_amf, rows)
 
 if ~isfield(details, 'rows')
     details.rows = [];
@@ -160,22 +186,22 @@ if ~isfield(details, 'szalim')
     details.szalim = 180;
 end
 
-areaweight(mod(vcd_flags,2) ~= 0) = 0;
-areaweight(cloud_frac > details.cloud_frac) = 0;
+bad_pix = false(size(cloud_frac));
+bad_pix = bad_pix | mod(vcd_flags,2) ~= 0;
+bad_pix = bad_pix | cloud_frac > details.cloud_frac;
 
 % As of 30 Aug 2017, the PSM OMI structure does not include date. This will
 % need to be rectified in the future. For now, just pass 0 as the date.
-areaweight(omi_rowanomaly(xtrack_flags, rows, 0, details.row_anom_mode)) = 0;
+bad_pix = bad_pix | omi_rowanomaly(xtrack_flags, rows, 0, details.row_anom_mode);
 
 if details.check_behr_amf
-    areaweight( isnan(behr_amf) | behr_amf <= behr_min_amf_val ) = 0;
+    bad_pix = bad_pix | isnan(behr_amf) | behr_amf <= behr_min_amf_val;
 end
 
 if ~isempty(details.rows)
-    areaweight( rows < min(details.rows) | rows > max(details.rows) ) = 0;
+    bad_pix = bad_pix | rows < min(details.rows) | rows > max(details.rows);
 end
 
-%areaweight( sza > details.szalim ) = 0;
 
 end
 
