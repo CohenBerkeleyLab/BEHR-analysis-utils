@@ -77,7 +77,7 @@ for i_param = 1:numel(params)
             
             % At the moment only daily files are used in the error
             % analysis
-            Base = load(fullfile(behr_paths.BEHRUncertSubdir('us'), 'BaseCase', behr_filename(date_from_behr_filenames(these_files(i_file).name), 'daily', region)));
+            Base = load(fullfile(behr_paths.BEHRUncertSubdir(region), 'BaseCase', behr_filename(date_from_behr_filenames(these_files(i_file).name), 'daily', region)));
             BaseGrid = Base.OMI;
             if numel(BaseGrid) ~= numel(ErrorData(i_change).DeltaGrid)
                 E.notimplemented('BaseGrid and DeltaGrid have different numbers of orbits (really this should not happen)')
