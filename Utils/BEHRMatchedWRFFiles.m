@@ -2,12 +2,15 @@ classdef BEHRMatchedWRFFiles < handle
     %UNTITLED Summary of this class goes here
     %   Detailed explanation goes here
     
+    properties
+        DEBUG_LEVEL;
+    end
+
     properties(SetAccess = protected)
         last_month;
         last_year;
         last_files;
         behr_region;
-        DEBUG_LEVEL;
     end
     
     methods
@@ -37,8 +40,8 @@ classdef BEHRMatchedWRFFiles < handle
                 else
                     obj.log(1, '     New month: need to get the directory listing\n');
                     [wrf_files, obj.last_files] = obj.closest_wrf_file_in_time(date_in, []);
-                    obj.last_month = month(total_dvec(d));
-                    obj.last_year = year(total_dvec(d));
+                    obj.last_month = month(date_in);
+                    obj.last_year = year(date_in);
                 end
             catch err
                 if strcmp(err.identifier, 'MATLAB:load:couldNotReadFile')
@@ -74,7 +77,7 @@ classdef BEHRMatchedWRFFiles < handle
         end
         
         function log(obj, level, msg, varargin)
-            if level >= obj.DEBUG_LEVEL
+            if obj.DEBUG_LEVEL >= level
                 fprintf(msg, varargin{:});
             end
         end
