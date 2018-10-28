@@ -46,7 +46,10 @@ classdef BEHRMatchedWRFFiles < handle
             catch err
                 if strcmp(err.identifier, 'MATLAB:load:couldNotReadFile')
                     obj.log(1, 'Cannot load file for %s\n', datestr(date_in));
-                    wrf_files = [];
+                    wrf_files = {};
+                elseif strcmp(err.identifier, 'find_wrf_path:dir_does_not_exist')
+                    obj.log(1, 'Could not find any WRF files for %s\n', datestr(date_in));
+                    wrf_files = {};
                 else
                     rethrow(err)
                 end
