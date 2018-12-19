@@ -1,23 +1,68 @@
 function results = wrf_time_average(start_dates,end_dates,variables,varargin)
-%UNTITLED2 Summary of this function goes here
-%   Detailed explanation goes here
+%WRF_TIME_AVERAGE Average WRF data for certain hours over a given time period
+%   RESULTS = WRF_TIME_AVERAGE( START_DATES, END_DATES, VARIABLES )
+%   Averages the VARIABLES (a cell array of WRF variables) for WRF files
+%   that coincide with an OMI overpass between START_DATES and END_DATES.
+%   The start and end dates may be any format understood by MAKE_DATEVEC.
+%
+%   Parameters:
+%       'domain' - the WRF domain to load data for. Must be understood as a
+%       region by BEHRMatchedWRFFiles. 'us' is default.
+%
+%       'processing' - a structure that controls how certain quantities are
+%       preprocessed before being averaged. This allows you to compute
+%       certain quantities derived from WRF variables that aren't defined
+%       in READ_WRF_PREPROC. Each field of processing must be names as one
+%       of the variables requested, and must itself be a structure with two
+%       fields:
+%           * 'variables' - a cell array of variables from the WRF file
+%           required to compute the desired quantity.
+%           * 'proc_fxn' - a handle to a function that accepts a structure
+%           returned by READ_WRF_VARS (which will have fields named for
+%           each WRF variable read from all files) and returns the computed
+%           quantity.
+%       An easy example would be if pressure and altitude were not defined
+%       in READ_WRF_PREPROC, they could be specified here by including
+%       'pressure' and 'altitude' in VARIABLES and making 'processing' the
+%       following structure:
+%
+%           processing.pressure = struct('variables', {{'P','PB'}},
+%               'proc_fxn', @(Wrf) Wrf.P + Wrf.PB);
+%           processing.altitude = struct('variables', {{'PH', 'PHB'}},
+%               'proc_fxn', @(Wrf) (Wrf.PH + Wrf.PHB)/9.81);
 
 p = advInputParser;
 p.addParameter('domain', 'us');
-p.addParameter('utc_range', nan);
-p.addParameter('utc_hour', nan);
-p.addParameter('local_hour', nan);
+p.addParameter('utc_range', nan); % unused - intended to allow averaging w/o BEHR files to match
+p.addParameter('utc_hour', nan); % unused - ditto
+p.addParameter('local_hour', nan); % unused - ditto
+p.addParameter('processing', struct());
 
 p.parse(varargin{:});
 pout = p.Results;
 
 domain = pout.domain;
+processing = pout.processing;
 % [time_mode, time_value] = setup_time_mode(pout);
 dvec = make_datevec(start_dates, end_dates);
 % file_utc_range = get_utc_range_to_load(time_mode, time_value, dvec(1), domain);
 
 MatchedFiles = BEHRMatchedWRFFiles('region',domain);
 local_hour = 13.5;
+
+% Handle quantities that need intermediate processing. Make sure their
+% variables are in the list of variables to load but they themselves are
+% not.
+xx_keep = true(size(variables));
+extra_vars = {};
+for i_var = 1:numel(variables)
+    varname = variables{i_var};
+    if isfield(processing, varname)
+        xx_keep(i_var) = false;
+        extra_vars = veccat(extra_vars, processing.(varname).variables);
+    end
+end
+variables_to_load = unique(veccat(variables(xx_keep), extra_vars, 'column'));
 
 
 for i_date = 1:numel(dvec)
@@ -39,7 +84,7 @@ for i_date = 1:numel(dvec)
         end
     end
     
-    Wrf = read_wrf_vars('', files, variables, 'squeeze', 'as_struct');
+    Wrf = read_wrf_vars('', files, variables_to_load, 'squeeze', 'as_struct');
     utc_hours = hour(date_from_wrf_filenames(files));
     
     for i_var = 1:numel(variables)
@@ -47,7 +92,13 @@ for i_date = 1:numel(dvec)
         if i_date == 1
             Avgs.(this_var) = RunningAverage();
         end
-        this_day_avg = wrf_day_weighted_average(xlon, local_hour, utc_hours, Wrf.(this_var));
+        
+        if isfield(processing, this_var)
+            quantity = processing.(this_var).proc_fxn(Wrf);
+        else
+            quantity = Wrf.(this_var);
+        end
+        this_day_avg = wrf_day_weighted_average(xlon, local_hour, utc_hours, quantity);
         Avgs.(this_var).addData(this_day_avg{1});
     end
 end
