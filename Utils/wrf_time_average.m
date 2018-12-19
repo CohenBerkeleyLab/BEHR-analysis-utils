@@ -8,6 +8,9 @@ p.addParameter('utc_range', nan);
 p.addParameter('utc_hour', nan);
 p.addParameter('local_hour', nan);
 
+p.parse(varargin{:});
+pout = p.Results;
+
 domain = pout.domain;
 % [time_mode, time_value] = setup_time_mode(pout);
 dvec = make_datevec(start_dates, end_dates);
@@ -18,7 +21,12 @@ local_hour = 13.5;
 
 
 for i_date = 1:numel(dvec)
+    fprintf('Loading WRF data for %s\n', datestr(dvec(i_date)));
     files = MatchedFiles.get_files_for_date(dvec(i_date));
+    if numel(files) == 0
+        fprintf('Could not load files for %s\n', datestr(dvec(i_date)))
+        continue
+    end
     
     xlon = ncread(files{1},'XLONG');
     xlat = ncread(files{1},'XLAT');
@@ -39,8 +47,8 @@ for i_date = 1:numel(dvec)
         if i_date == 1
             Avgs.(this_var) = RunningAverage();
         end
-        this_day_avg = wrf_day_weighted_average(wrf_lon, local_hour, utc_hours, Wrf.(this_var));
-        Avgs.(this_var).addData(this_day_avg);
+        this_day_avg = wrf_day_weighted_average(xlon, local_hour, utc_hours, Wrf.(this_var));
+        Avgs.(this_var).addData(this_day_avg{1});
     end
 end
 
