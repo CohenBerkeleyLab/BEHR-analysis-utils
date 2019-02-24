@@ -9,6 +9,13 @@ function results = wrf_time_average(start_dates,end_dates,variables,varargin)
 %       'domain' - the WRF domain to load data for. Must be understood as a
 %       region by BEHRMatchedWRFFiles. 'us' is default.
 %
+%       'matched_wrf_files' - alternatively, use this to pass an instance
+%       of BEHRMatchedWRFFiles to use to find the WRF files for the
+%       requested dates. Passing this is advantageous if you will be doing
+%       lots of short averages within one month, as the instance can keep a
+%       list of all WRF files for that month without having to rebuild it
+%       every time this function is called.
+%
 %       'processing' - a structure that controls how certain quantities are
 %       preprocessed before being averaged. This allows you to compute
 %       certain quantities derived from WRF variables that aren't defined
@@ -37,6 +44,7 @@ p.addParameter('utc_range', nan); % unused - intended to allow averaging w/o BEH
 p.addParameter('utc_hour', nan); % unused - ditto
 p.addParameter('local_hour', nan); % unused - ditto
 p.addParameter('processing', struct());
+p.addParameter('matched_wrf_files', []);
 
 p.parse(varargin{:});
 pout = p.Results;
@@ -47,7 +55,10 @@ processing = pout.processing;
 dvec = make_datevec(start_dates, end_dates);
 % file_utc_range = get_utc_range_to_load(time_mode, time_value, dvec(1), domain);
 
-MatchedFiles = BEHRMatchedWRFFiles('region',domain);
+MatchedFiles = pout.matched_wrf_files;
+if isempty(MatchedFiles)
+    MatchedFiles = BEHRMatchedWRFFiles('region',domain);
+end
 local_hour = 13.5;
 
 % Handle quantities that need intermediate processing. Make sure their
