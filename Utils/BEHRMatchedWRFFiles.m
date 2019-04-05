@@ -30,16 +30,16 @@ classdef BEHRMatchedWRFFiles < handle
             obj.DEBUG_LEVEL = pout.DEBUG_LEVEL;
         end
         
-        function wrf_files = get_files_for_date(obj,date_in)
+        function [wrf_files, behr_data] = get_files_for_date(obj,date_in)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
             try
                 if month(date_in) == obj.last_month && year(date_in) == obj.last_year
                     obj.log(1, '     Using existing list of WRF files\n');
-                    wrf_files = obj.closest_wrf_file_in_time(date_in, obj.last_files);
+                    [wrf_files, ~, behr_data] = obj.closest_wrf_file_in_time(date_in, obj.last_files);
                 else
                     obj.log(1, '     New month: need to get the directory listing\n');
-                    [wrf_files, obj.last_files] = obj.closest_wrf_file_in_time(date_in, []);
+                    [wrf_files, obj.last_files, behr_data] = obj.closest_wrf_file_in_time(date_in, []);
                     obj.last_month = month(date_in);
                     obj.last_year = year(date_in);
                 end
@@ -59,7 +59,7 @@ classdef BEHRMatchedWRFFiles < handle
     
     methods(Access = protected)
         
-        function [wrf_files, F] = closest_wrf_file_in_time(obj, date_in, F)
+        function [wrf_files, F, Data] = closest_wrf_file_in_time(obj, date_in, F)
             % Finds the WRF files closest in time to each swath in the BEHR
             % file for the DATE_IN. Returns the list of files as a cell
             % array. Can pass F in, which should be a structure returned
