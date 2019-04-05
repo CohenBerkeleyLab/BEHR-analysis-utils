@@ -59,7 +59,7 @@ for i_date = 1:numel(dvec)
         pressure = behr_pres_levels();
         
         [no2Profile, ~, wrf_file, ~, ~, ~, ~, ~, ~, extra_profs] = rProfile_WRF(...
-            dvec(i_date), prof_mode, region, loncorns, latcorns,...
+            dvec(i_date), 'daily', region, loncorns, latcorns,...
             time, globe_terheight, pressure, no2_profile_path, 'extra_wrf_vars', {'no'});
         
         no2Profile = permute(no2Profile, [2 3 1]);
@@ -79,7 +79,7 @@ for i_date = 1:numel(dvec)
         GriddedProfs(i_orbit).BEHRQualityFlags = OMI(i_orbit).BEHRQualityFlags;
         [GriddedProfs(i_orbit).no2, GriddedProfs(i_orbit).Areaweight] = cvm_generic_wrapper(loncorns, latcorns, no2Profile,...
             Data(i_orbit).Grid, 'weights', Areaweight);
-        GriddedProfs(i_orbit).no2 = cvm_generic_wrapper(loncorns, latcorns, no, Data(i_orbit).Grid, 'weights', Areaweight);
+        GriddedProfs(i_orbit).no = cvm_generic_wrapper(loncorns, latcorns, no, Data(i_orbit).Grid, 'weights', Areaweight);
     end
     
     savename = sprintf('WRF_BEHR_PROFILES_%s.mat', datestr(dvec(i_date), 'yyyymmdd'));
